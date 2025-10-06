@@ -1,0 +1,7 @@
+params/*
+
+functions/DAlphaBall.gcc
+
+functions/dssp
+
+functions/__pycache__/*

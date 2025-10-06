@@ -1,5 +1,5 @@
 #!/bin/bash
-################## BindCraft installation script
+################## bindcraft_git installation script
 ################## specify conda/mamba folder, and installation folder for git repositories, and whether to use mamba or $pkg_manager
 # Default value for pkg_manager
 pkg_manager='conda'
@@ -49,16 +49,16 @@ install_dir=$(pwd)
 CONDA_BASE=$(conda info --base 2>/dev/null) || { echo -e "Error: conda is not installed or cannot be initialised."; exit 1; }
 echo -e "Conda is installed at: $CONDA_BASE"
 
-### BindCraft install begin, create base environment
-echo -e "Installing BindCraft environment\n"
-$pkg_manager create --name BindCraft python=3.10 -y || { echo -e "Error: Failed to create BindCraft conda environment"; exit 1; }
-conda env list | grep -w 'BindCraft' >/dev/null 2>&1 || { echo -e "Error: Conda environment 'BindCraft' does not exist after creation."; exit 1; }
+### bindcraft_git install begin, create base environment
+echo -e "Installing bindcraft_git environment\n"
+$pkg_manager create --name bindcraft_git python=3.10 -y || { echo -e "Error: Failed to create bindcraft_git conda environment"; exit 1; }
+conda env list | grep -w 'bindcraft_git' >/dev/null 2>&1 || { echo -e "Error: Conda environment 'bindcraft_git' does not exist after creation."; exit 1; }
 
-# Load newly created BindCraft environment
-echo -e "Loading BindCraft environment\n"
-source ${CONDA_BASE}/bin/activate ${CONDA_BASE}/envs/BindCraft || { echo -e "Error: Failed to activate the BindCraft environment."; exit 1; }
-[ "$CONDA_DEFAULT_ENV" = "BindCraft" ] || { echo -e "Error: The BindCraft environment is not active."; exit 1; }
-echo -e "BindCraft environment activated at ${CONDA_BASE}/envs/BindCraft"
+# Load newly created bindcraft_git environment
+echo -e "Loading bindcraft_git environment\n"
+source ${CONDA_BASE}/bin/activate ${CONDA_BASE}/envs/bindcraft_git || { echo -e "Error: Failed to activate the bindcraft_git environment."; exit 1; }
+[ "$CONDA_DEFAULT_ENV" = "bindcraft_git" ] || { echo -e "Error: The bindcraft_git environment is not active."; exit 1; }
+echo -e "bindcraft_git environment activated at ${CONDA_BASE}/envs/bindcraft_git"
 
 # install required conda packages
 echo -e "Instaling conda requirements\n"
@@ -124,7 +124,7 @@ chmod +x "${install_dir}/functions/DAlphaBall.gcc" || { echo -e "Error: Failed t
 
 # finish
 conda deactivate
-echo -e "BindCraft environment set up\n"
+echo -e "bindcraft_git environment set up\n"
 
 ############################################################################################################
 ############################################################################################################
@@ -135,7 +135,7 @@ echo -e "$pkg_manager cleaned up\n"
 
 ################## finish script
 t=$SECONDS 
-echo -e "Successfully finished BindCraft installation!\n"
-echo -e "Activate environment using command: \"$pkg_manager activate BindCraft\""
+echo -e "Successfully finished bindcraft_git installation!\n"
+echo -e "Activate environment using command: \"$pkg_manager activate bindcraft_git\""
 echo -e "\n"
 echo -e "Installation took $(($t / 3600)) hours, $((($t / 60) % 60)) minutes and $(($t % 60)) seconds."

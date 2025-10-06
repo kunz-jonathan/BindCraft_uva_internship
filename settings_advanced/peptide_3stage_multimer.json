@@ -62,5 +62,7 @@
     "start_monitoring": 1000,
     "af_params_dir": "",
     "dssp_path": "",
-    "dalphaball_path": ""
+    "dalphaball_path": "",
+    "loss_func_seq": true,
+    "weights_seq_loss": 0.3
 }

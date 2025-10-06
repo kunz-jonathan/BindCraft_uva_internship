@@ -16,6 +16,7 @@ from colabdesign.shared.utils import copy_dict
 from .biopython_utils import hotspot_residues, calculate_clash_score, calc_ss_percentage, calculate_percentages
 from .pyrosetta_utils import pr_relax, align_pdbs
 from .generic_utils import update_failures
+from .seq_loss import add_seq_loss
 
 # hallucinate a binder
 def binder_hallucination(design_name, starting_pdb, chain, target_hotspot_residues, length, seed, helicity_value, design_models, advanced_settings, design_paths, failure_csv):
@@ -50,6 +51,12 @@ def binder_hallucination(design_name, starting_pdb, chain, target_hotspot_residu
         
 
     ### additional loss functions
+    
+    if advanced_settings['loss_func_seq']:
+        add_seq_loss(af_model, advanced_settings["weights_seq_loss"])
+    
+    
+    # BindCraft natives
     if advanced_settings["use_rg_loss"]:
         # radius of gyration loss
         add_rg_loss(af_model, advanced_settings["weights_rg"])
