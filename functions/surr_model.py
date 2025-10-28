@@ -1,15 +1,44 @@
-import jax
-import jax.numpy as jnp
-import haiku as hk
-import optax
-
-import pandas as pd
+import math
+import os
 import pickle
 
+import equinox as eqx
+import esm  # pip install fair-esm==2.0.0
+import esm2quinox
+import haiku as hk
+import jax
+import jax.lax as lax
+import jax.numpy as jnp
+import jax.random as jr
+import jax.random as jrandom
+import numpy as np
+import optax  # pip install optax
+import pandas as pd
 from jax import config
+from torch.utils.data import DataLoader, RandomSampler, random_split
 
 config.update("jax_default_matmul_precision", "float32")
 
+class AFF_PREDICTOR(eqx.Module):
+    model: esm2quinox.ESM2
+    mlp: eqx.nn.MLP
+    linear: eqx.nn.Linear
+
+    def __init__(self, model, key):
+        self.model = model #(num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
+        self.mlp = eqx.nn.MLP(in_size=320,out_size= 1, key=key,width_size=10,depth=5)  # assuming embed_size=33
+        self.linear = eqx.nn.Linear(in_features=1, out_features=1, key=key)
+
+    def __call__(self, tokens):
+        
+        out = self.model(tokens)
+        # Pooling: mean over sequence length (ignoring padding)
+        # mask = tokens
+        # jax.debug.print('tokens {tokens}',tokens=tokens)
+        # lengths = mask.sum(axis=1, keepdims=True)
+        # pooled = (out.hidden * mask[..., None]).sum(axis=1) / lengths
+        out_mlp = self.mlp(out.hidden[0])
+        return self.linear(out_mlp)
 
 
 class CNNAffinityPredictor(hk.Module):
@@ -182,3 +211,7 @@ def init_surr_model():
         params_restored = pickle.load(f)
 
     return model, params_restored, rng
+
+@eqx.filter_jit
+def predict(model, seq):
+    return jax.vmap(model)(seq)
