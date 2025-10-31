@@ -8,3 +8,5 @@ functions/__pycache__/*
 .vscode/settings.json
 .gitignore
 notebooks/__pycache__
+data
+.gitignore

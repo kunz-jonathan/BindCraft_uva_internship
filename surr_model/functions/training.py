@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import tqdm
 
 
-@eqx.filter_value_and_grad(has_aux=True)
+@eqx.filter_value_and_grad()
 def compute_loss(model, x_prot, x_pept, y, key):
     """
     Computes loss batched with vmap across first axis
@@ -18,7 +18,7 @@ def compute_loss(model, x_prot, x_pept, y, key):
         MSE
         updated model state
     """
-    pred_y = jax.vmap(model, axis_name="batch", in_axes=(0, None), out_axes=(0, None))(
+    pred_y = jax.vmap(model)(
         x_prot, x_pept,key=key
     )
     loss = jnp.mean((pred_y - y) ** 2)
@@ -39,7 +39,7 @@ def eval_step(model, x, y):
         MSE
         pred_Y
     """
-    pred_y, _ = jax.vmap(model)(x)  # do i actually need the axis_stuff
+    pred_y = jax.vmap(model)(x)  # do i actually need the axis_stuff
     loss = jnp.mean((pred_y - y) ** 2)
     return loss, pred_y
 
@@ -63,7 +63,7 @@ def make_step(model, x_prot, x_pept, y, opt_state, optim, key):
         updated state
         updated optimizer state
     """
-    (loss, state), grads = compute_loss(model, x_prot, x_pept, y, key)
+    loss, grads = compute_loss(model, x_prot, x_pept, y, key)
     updates, opt_state = optim.update(grads, opt_state)
     model = eqx.apply_updates(model, updates)
     return loss, model, opt_state
@@ -103,12 +103,14 @@ def train_model(
     # best_model = eqx.tree_serialise_leaves(model)
     for epoch in tqdm.tqdm(range(max_epochs), desc="Epochs", position=0, leave=True):
         # ---- TRAIN ----
+        key_train = jax.random.split(key, 5)
+        
         for x_prot, x_pept, y in tqdm.tqdm(
             training_DataLoader, desc="Training-Set", position=1, leave=False
         ):
             x_prot, x_pept, y = jnp.array(x_prot), jnp.array(x_pept), jnp.array(y)
             loss, model_aff, opt_state = make_step(
-                model_aff, x_prot, x_pept, y, opt_state, optim, key
+                model_aff, x_prot, x_pept, y, opt_state, optim, key_train
             )
         train_losses.append(loss.item())
 
@@ -116,6 +118,7 @@ def train_model(
         inference_model = eqx.nn.inference_mode(model_aff)
         inference_model = eqx.Partial(inference_model)
         val_batch_losses = []
+        key_val = jax.random.split(key, 3)
         for x_val, y_val in tqdm.tqdm(
             validation_Dataloader, desc="Validation-Set", position=2, leave=False
         ):
