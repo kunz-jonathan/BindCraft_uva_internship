@@ -45,11 +45,11 @@ class Prediction_Head(eqx.Module):
             eqx.nn.Linear(in_features=32, out_features=1, key=key3),
         ]
 
-    def __call__(self, tokens_prot, tokens_pept, key):
-        x = jnp.concat(tokens_prot, tokens_pept, dim=1)  # [H] -> [2H]
+    def __call__(self, x, key):
+        
         for layer in self.layers:
             if isinstance(layer, eqx.nn.Dropout):
-                x = layer(x, key)
+                x = layer(x,key=  key)
             else:
                 x = layer(x)
         return x
@@ -196,7 +196,7 @@ class AFF_PREDICTOR(eqx.Module):
         # protein cnn stack
         for layer in self.cnn_stack:
             if isinstance(layer, eqx.nn.Dropout):
-                x = layer(x, key)
+                x = layer(x,key= key)
             else:
                 x = layer(x)
 
@@ -218,7 +218,7 @@ class AFF_PREDICTOR(eqx.Module):
         # protein cnn stack
         for layer in self.cnn_stack:
             if isinstance(layer, eqx.nn.Dropout):
-                x = layer(x, key)
+                x = layer(x, key= key)
             else:
                 x = layer(x)
 
@@ -233,7 +233,7 @@ class AFF_PREDICTOR(eqx.Module):
 
         ### PREDICTION-HEAD ###
 
-        conc = jnp.concat(x_protein, x_peptide)  # out: ([batch], embedding * 2)
+        conc = jnp.concat((x_protein, x_peptide))  # out: ([batch], embedding * 2)
         pred_aff = self.prediction_head(conc, key)
 
         return pred_aff
