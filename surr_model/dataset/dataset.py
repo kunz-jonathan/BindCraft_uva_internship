@@ -92,3 +92,55 @@ def initialize_datasets(paths: List, batches=List):
     test_DataLoader = DataLoader(Dataset_test, batch_size=batches[2])
 
     return training_DataLoader, validation_DataLoader, test_DataLoader
+
+class Dataset_PEPBI:
+    def __init__(self, transform=None, columns=List, data_path=Path) -> None:
+        """
+        columns (List):
+            0 ~ sequence_prot
+            1 ~ sequence_pept
+            2 ~ aff_Vals - alr. scaled
+        """
+        self.data = pd.read_csv(data_path)
+
+        self.sequences_prot = self.data[columns[0]].tolist()
+        self.sequences_prot = [x.strip() for x in self.sequences_prot]
+        #self.sequences_prot = [x.split("-")[0] for x in self.sequences_prot]
+        self.sequences_pept = self.data[columns[1]].tolist()
+        self.sequences_pept = [x.strip() for x in self.sequences_pept]
+        self.aff_Vals = -1* np.array(self.data[columns[2]])
+        self.transform = transform
+        self.max_seq_prot = 0
+        self.max_seq_pept = 0
+
+        for seq in self.sequences_prot:
+            if self.max_seq_prot < len(seq):
+                self.max_seq_prot = len(seq)
+
+        for seq in self.sequences_pept:
+            if self.max_seq_pept < len(seq):
+                self.max_seq_pept = len(seq)
+
+    def __len__(self):
+        return len(self.sequences_pept)
+
+    def __getitem__(self, idx):
+        affVal = self.aff_Vals[idx]
+
+        # protein
+        seq = self.sequences_prot[idx]
+        if self.transform:
+            padd_len = self.max_seq_prot - len(seq)
+            seq = self.transform([seq + "." * padd_len])[0]
+
+            seq_prot = np.array(seq)
+
+        # peptide
+        seq = self.sequences_pept[idx]
+        if self.transform:
+            padd_len = self.max_seq_pept - len(seq)
+            seq = self.transform([seq + "." * padd_len])[0]
+
+            seq_pept = np.array(seq)
+
+        return seq_prot, seq_pept, affVal

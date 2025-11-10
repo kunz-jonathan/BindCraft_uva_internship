@@ -5,7 +5,7 @@ import jax.random as jrandom
 import optax  # pip install optax
 from dataset import initialize_datasets, Dataset_PEPBI
 from model import AFF_PREDICTOR
-from training_wo_val import train_model, eval_step
+from surr_model.functions.training_wo_val import train_model, eval_step
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import seaborn as sns

@@ -5,8 +5,10 @@ functions/DAlphaBall.gcc
 functions/dssp
 
 functions/__pycache__/*
-.vscode/settings.json
-.gitignore
+.vscode
+
 notebooks/__pycache__
 data
-.gitignore
+
+surr_model/dataset/__pycache__
+surr_model/functions/__pycache__
