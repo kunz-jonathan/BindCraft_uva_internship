@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import jax.random as jr
 from collections.abc import Callable
+import optax 
 
 
 ####========NONSENSE========####
@@ -158,3 +159,58 @@ class AFF_PREDICTOR(eqx.Module):
         pred_aff = self.prediction_head(conc, key)
 
         return pred_aff, state
+
+class stripped_PREDICTOR(eqx.Module):
+    esm2: esm2quinox.ESM2
+    prot_droput: eqx.nn.Dropout
+    pept_droput: eqx.nn.Dropout
+    prot_projection: eqx.nn.Linear
+    pept_projection: eqx.nn.Linear
+    
+
+    def __init__(self, model, key):
+        key1, key2= jr.split(key, 2)
+
+        self.esm2 = model  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
+        # output size is 480
+        self.prot_droput = eqx.nn.Dropout(p=0.2)
+        self.prot_projection = eqx.nn.Linear(in_features=320,out_features=256,key=key1)
+        
+        self.pept_droput = eqx.nn.Dropout(p=0.2)
+        self.pept_projection = eqx.nn.Linear(in_features=320,out_features=256,key=key2)
+
+    def __call__(self, tokens_prot, tokens_pept, state, key):
+        ### PROTEIN ###
+        emb_prot = self.esm2(tokens_prot).hidden  # ([batch], seq_length, 320)
+        emb_prot = jnp.transpose(emb_prot, (1, 0))  # out: ([batch], 320, seq_length)
+        x_prot = jnp.array(emb_prot)
+        x_prot = jnp.mean(
+            x_prot, axis=1, keepdims=True
+        )  # mean along the sequence so that out: ([batch],embedding,1)
+        x_prot = jnp.transpose(
+            x_prot, (1, 0)
+        ).squeeze() 
+        x_prot = self.prot_droput(x_prot,key=key)
+        x_prot = self.prot_projection(x_prot)
+        
+
+        ### PEPTIDE ###
+        emb_pept = self.esm2(tokens_pept).hidden  # ([batch], seq_length, 320)
+        emb_pept = jnp.transpose(emb_pept, (1, 0))  # out: ([batch], 320, seq_length)
+        x_pept = jnp.array(emb_pept)
+        x_pept = jnp.mean(
+            x_pept, axis=1, keepdims=True
+        )  # mean along the sequence so that out: ([batch],embedding,1)
+        x_pept = jnp.transpose(
+            x_pept, (1, 0)
+        ).squeeze() 
+        x_pept = self.pept_droput(x_pept,key=key)
+        x_pept = self.pept_projection(x_pept)
+
+
+        ### PREDICTION-HEAD ###
+        pred_aff = optax.cosine_similarity(x_prot,x_pept)
+        
+
+        return pred_aff, state
+
