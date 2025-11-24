@@ -15,7 +15,7 @@ import optax  # pip install optax
 import pandas as pd
 from torch.utils.data import DataLoader, RandomSampler, random_split
 from colabdesign.af.alphafold.common import residue_constants
-from surr_model.functions.model import AFF_PREDICTOR
+from surr_model.functions.model import AFF_PREDICTOR, stripped_PREDICTOR
 import pickle
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
@@ -41,16 +41,16 @@ def add_seq_loss(self, loss_weight: float) -> None:
     # initializing models
     torch_model, _ = esm.pretrained.esm2_t6_8M_UR50D()
     model_esm2 = esm2quinox.from_torch(torch_model)
-    model_aff, model_state = eqx.nn.make_with_state(AFF_PREDICTOR)(
+    model_aff, model_state = eqx.nn.make_with_state(stripped_PREDICTOR)(
         model=model_esm2, key=model_key
     )
-    # load trained model
-    best_model_aff = eqx.tree_deserialise_leaves('/home/jkunz/master_uni_hd/internship_amsterdam/BindCraft_uva_internship/surr_model/params/params_only_seq.pkl',model_aff)
-    best_model_state = pickle.load(open('/home/jkunz/master_uni_hd/internship_amsterdam/BindCraft_uva_internship/surr_model/params/state_only_seq.pkl','rb'))
 
     # set to inference mode
-    inference_model = eqx.nn.inference_mode(best_model_aff)
-    inference_model = eqx.Partial(inference_model, state=best_model_state)
+    inference_model = eqx.nn.inference_mode(model_aff)
+    inference_model = eqx.Partial(inference_model, state=model_state)
+    
+    # load best inference pretrained model
+    best_model_aff = eqx.tree_deserialise_leaves('/home/kunzj/BindCraft_uva_internship/surr_model/params/model_inference.eqx',inference_model)
     
     # define target sequence
     target_str =['QPRGGGPTSSEQIMKTGALLLQGFIQDRAGRMGGEAPELALDPVPQDASTKKLSECLKRIGDELDSNMELQRMIAAVDTDSPREVFFRVAADMFSDGNFNWGRVVALFYFASKLVLKALCTKVPELIRTIMGWTLDFLRERLLGWIQDQGGWDGLLSYFG']
@@ -81,7 +81,7 @@ def add_seq_loss(self, loss_weight: float) -> None:
         """
 
         seq_esm = seq_to_esm_numbers(aux["seq"]["pseudo"].argmax(-1))
-        pred_y, _ = jax.vmap(inference_model)(x_prot, seq_esm, key=call_key).squeeze()
+        pred_y, _ = jax.vmap(best_model_aff)(x_prot, seq_esm, key=call_key).squeeze()
         #  pred_y from -1,+1 scale so that -1 low loss and +1 high loss
         seq_loss = pred_y
         return {"seq_loss": seq_loss}

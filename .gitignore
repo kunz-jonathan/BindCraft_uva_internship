@@ -8,7 +8,7 @@ functions/__pycache__/*
 .vscode
 
 notebooks/__pycache__
-data
+
 
 surr_model/dataset/__pycache__
 surr_model/functions/__pycache__

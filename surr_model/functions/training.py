@@ -246,7 +246,7 @@ def train_model_validation(
     # best_state = eqx.tree_serialise_leaves(state)
     # best_model = eqx.tree_serialise_leaves(model)
 
-    for epoch in tqdm.tqdm(range(max_epochs), desc="Epochs", position=0, leave=True):
+    for epoch in tqdm.tqdm(range(max_epochs), desc="Epochs", position=0, leave=False):
         # ---- TRAIN ----
         for x_prot, x_pept, y in tqdm.tqdm(
             training_DataLoader, desc="Training-Set", position=1, leave=False
@@ -282,7 +282,7 @@ def train_model_validation(
 
             val_batch_losses.append(val_loss.item())
 
-        val_loss = jnp.mean(jnp.array(val_batch_losses))
+        val_loss = jnp.mean(val_batch_losses)
         val_losses.append(val_loss)
 
         print(
