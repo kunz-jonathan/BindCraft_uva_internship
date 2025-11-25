@@ -174,10 +174,10 @@ class stripped_PREDICTOR(eqx.Module):
         self.esm2 = model  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
         # output size is 480
         self.prot_droput = eqx.nn.Dropout(p=0.2)
-        self.prot_projection = eqx.nn.Linear(in_features=320,out_features=256,key=key1)
+        self.prot_projection = eqx.nn.Linear(in_features=640,out_features=320,key=key1)
         
         self.pept_droput = eqx.nn.Dropout(p=0.2)
-        self.pept_projection = eqx.nn.Linear(in_features=320,out_features=256,key=key2)
+        self.pept_projection = eqx.nn.Linear(in_features=640,out_features=320,key=key2)
 
     def __call__(self, tokens_prot, tokens_pept, state, key):
         ### PROTEIN ###
@@ -191,6 +191,7 @@ class stripped_PREDICTOR(eqx.Module):
             x_prot, (1, 0)
         ).squeeze() 
         x_prot = self.prot_droput(x_prot,key=key)
+        
         x_prot = self.prot_projection(x_prot)
         
 
@@ -214,3 +215,101 @@ class stripped_PREDICTOR(eqx.Module):
 
         return pred_aff, state
 
+class combined_PREDICTOR(eqx.Module):
+    esm2: esm2quinox.ESM2
+    cnn_stack: list[eqx.nn.Conv1d | eqx.nn.Dropout | eqx.nn.BatchNorm | Callable]
+
+    def __init__(self, model, key):
+        key1, key2, key3, key4 = jr.split(key, 4)
+
+        self.esm2 = model  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
+        # output size is 480
+
+        self.cnn_stack = [
+            eqx.nn.Conv1d(
+                in_channels=320,
+                out_channels=256,
+                kernel_size=5,
+                padding="SAME",
+                stride=1,
+                key=key1,
+            ),
+            jax.nn.relu,
+            eqx.nn.Dropout(p=0.2),
+            eqx.nn.BatchNorm(256, axis_name="batch"),
+            eqx.nn.Conv1d(
+                in_channels=256,
+                out_channels=128,
+                kernel_size=5,
+                padding="SAME",
+                stride=1,
+                key=key2,
+            ),
+            jax.nn.relu,
+            eqx.nn.Dropout(p=0.2),
+            eqx.nn.BatchNorm(128, axis_name="batch"),
+            eqx.nn.Conv1d(
+                in_channels=128,
+                out_channels=64,
+                kernel_size=5,
+                padding="SAME",
+                stride=1,
+                key=key3,
+            ),
+            jax.nn.relu,
+            eqx.nn.Dropout(p=0.2),
+            eqx.nn.BatchNorm(64, axis_name="batch"),
+        ]
+
+
+    def __call__(self, tokens_prot, tokens_pept, state, key):
+        ### PROTEIN ###
+        emb_prot = self.esm2(tokens_prot).hidden  # ([batch], seq_length, 320)
+        emb_prot = jnp.transpose(emb_prot, (1, 0))  # out: ([batch], 320, seq_length)
+        x = jnp.array(emb_prot)
+
+        for layer in self.cnn_stack:
+            if isinstance(layer, eqx.nn.Dropout):
+                x = layer(x, key=key)
+            elif isinstance(layer, eqx.nn.BatchNorm):
+                x, state = layer(x, state)
+            else:
+                x = layer(x)
+
+        # simple mean along embedding, however could be extended to attention_mean, not sure if necessary
+        x_pooled = jnp.mean(
+            x, axis=1, keepdims=True
+        )  # mean along the sequence so that out: ([batch],embedding,1)
+
+        x_protein = jnp.transpose(
+            x_pooled, (1, 0)
+        ).squeeze()  # out: ([batch], embedding)
+
+        ### PEPTIDE ###
+        emb_pept = self.esm2(tokens_pept).hidden  # ([batch], seq_length, 320)
+        emb_pept = jnp.transpose(emb_pept, (1, 0))  # out: ([batch], 320, seq_length)
+        x = jnp.array(emb_pept)
+
+        # protein cnn stack
+        for layer in self.cnn_stack:
+            if isinstance(layer, eqx.nn.Dropout):
+                x = layer(x, key=key)
+            elif isinstance(layer, eqx.nn.BatchNorm):
+                x, state = layer(x, state)
+            else:
+                x = layer(x)
+
+        # simple mean along embedding, however could be extended to attention_mean, not sure if necessary
+        x_pooled = jnp.mean(
+            x, axis=1, keepdims=True
+        )  # mean along the sequence so that out: ([batch],embedding,1)
+
+        x_peptide = jnp.transpose(
+            x_pooled, (1, 0)
+        ).squeeze()  # out: ([batch], embedding)
+
+        ### PREDICTION-HEAD ###
+
+        pred_aff = optax.cosine_similarity(x_protein,x_peptide)
+
+        return pred_aff, state
