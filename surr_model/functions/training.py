@@ -78,6 +78,41 @@ def filter_model_stripped(model):
 
     return filter_spec
 
+def filter_model_fine_tuning(model):
+    """
+    Freeze the esm2 stack in the stripped_PREDICTOR model and
+    enable training for the two projection Linear layers.
+    """
+    # start with everything frozenFalse
+    filter_spec = jtu.tree_map(lambda _: False, model)
+
+    # Unfreeze prot_projection weight & bias
+    filter_spec = eqx.tree_at(
+        lambda t: (t.prot_projection.weight, t.prot_projection.bias),
+        filter_spec,
+        replace=(True, True),
+    )
+
+    # Unfreeze pept_projection weight & bias
+    filter_spec = eqx.tree_at(
+        lambda t: (t.pept_projection.weight, t.pept_projection.bias),
+        filter_spec,
+        replace=(True, True),
+    )
+    
+    filter_spec = eqx.tree_at(
+        lambda t: (t.prot_inter_one.weight, t.prot_inter_one.bias),
+        filter_spec,
+        replace=(True, True),
+    )
+
+    filter_spec = eqx.tree_at(
+        lambda t: (t.pept_inter_one.weight, t.pept_inter_one.bias),
+        filter_spec,
+        replace=(True, True),
+    )
+
+    return filter_spec
 
 @eqx.filter_value_and_grad(has_aux=True)
 def compute_loss(diff_model, static_model, model_state, x_prot, x_pept, y, key):
@@ -174,6 +209,34 @@ def make_step_stripped(model, model_state, x_prot, x_pept, y, opt_state, optim, 
         updated optimizer state
     """
     filter_spec = filter_model_stripped(model)
+    diff_model, static_model = eqx.partition(model, filter_spec)
+    (loss, model_state), grads = compute_loss(
+        diff_model, static_model, model_state, x_prot, x_pept, y, key
+    )
+    updates, opt_state = optim.update(grads, opt_state)
+    model = eqx.apply_updates(model, updates)
+    return loss, model, model_state, opt_state
+
+@eqx.filter_jit
+def make_step_fine_tuning(model, model_state, x_prot, x_pept, y, opt_state, optim, key):
+    """
+    Gradient update step
+
+    Args:
+        modelfilter_spec
+        state
+        x,y
+        optimizer state
+        model satte
+        optimizer
+
+    Returns:
+        MSE-loss
+        updated model
+        updated state
+        updated optimizer state
+    """
+    filter_spec = filter_model_fine_tuning(model)
     diff_model, static_model = eqx.partition(model, filter_spec)
     (loss, model_state), grads = compute_loss(
         diff_model, static_model, model_state, x_prot, x_pept, y, key
@@ -356,6 +419,106 @@ def train_model_validation(
         val_losses,
     )
 
+
+def train_model_fine_tuning(
+    training_DataLoader,
+    validation_Dataloader,
+    max_epochs,
+    model_aff,
+    model_state,
+    optim,
+    opt_state,
+    key,
+):
+    """
+    training wrapper with validation step
+
+    Args:
+        test_dataloader
+        training_dataloder
+        initialized model
+        initialized model state
+        initialized optim state
+        num_echos to train
+
+    Returns:
+        best_model
+        best_state
+        train_losses
+        val_losses
+
+    """
+
+    train_losses = []
+    val_losses = []
+    best_val = jnp.inf
+    best_state = 0
+    best_model = 0
+
+    # use this when model is actually working
+    # best_state = eqx.tree_serialise_leaves(state)
+    # best_model = eqx.tree_serialise_leaves(model)
+
+    for epoch in tqdm.tqdm(range(max_epochs), desc="Epochs", position=0, leave=False):
+        train_batch_losses = 0
+        # ---- TRAIN ----
+        for x_prot, x_pept, y in tqdm.tqdm(
+            training_DataLoader, desc="Training-Set", position=1, leave=False
+        ):
+            x_prot, x_pept, y = jnp.array(x_prot), jnp.array(x_pept), jnp.array(y)
+
+            loss, model_aff, model_state, opt_state = make_step_finetuned(
+                model_aff, model_state, x_prot, x_pept, y, opt_state, optim, key
+            )
+
+            train_batch_losses += loss.item()
+
+        train_losses.append((train_batch_losses / training_DataLoader.__len__()))
+        # ---- VALIDATION ----
+        inference_model = eqx.nn.inference_mode(model_aff)
+        inference_model = eqx.Partial(inference_model, state=model_state)
+
+        val_batch_losses = 0
+
+        for x_prot_val, x_pept_val, y_val in tqdm.tqdm(
+            validation_Dataloader, desc="Validation-Set", position=2, leave=False
+        ):
+            x_prot_val, x_pept_val, y_val = (
+                jnp.array(x_prot_val),
+                jnp.array(x_pept_val),
+                jnp.array(y_val),
+            )
+
+            test_key = jr.split(key, x_pept_val.shape[0])
+
+            val_loss, _ = eval_step(
+                inference_model, x_prot_val, x_pept_val, y_val, test_key
+            )
+
+            val_batch_losses += val_loss.item()
+
+        val_losses.append((val_batch_losses / validation_Dataloader.__len__()))
+
+        print(
+            f"[Epoch {epoch + 1}] Train Loss: {train_losses[-1]:.6f}, Val Loss: {val_loss:.6f}"
+        )
+
+        # ---- Checkpoint Best ----
+        if val_losses[-1] < best_val:
+            best_val = val_losses[-1]
+            best_state = model_state
+            best_model = model_aff
+
+            # best_state = eqx.tree_serialise_leaves(state)
+            # best_model = eqx.tree_serialise_leaves(model)
+            print("\t(New best model saved.)")
+    print("Training complete.")
+    return (
+        best_model,
+        best_state,
+        train_losses,
+        val_losses,
+    )
 
 def train_model_validation_combined(
     training_DataLoader,

@@ -108,7 +108,7 @@ class Dataset_PEPBI:
         #self.sequences_prot = [x.split("-")[0] for x in self.sequences_prot]
         self.sequences_pept = self.data[columns[1]].tolist()
         self.sequences_pept = [x.strip() for x in self.sequences_pept]
-        self.aff_Vals = -1* np.array(self.data[columns[2]])
+        self.aff_Vals = np.array(self.data[columns[2]])
         self.transform = transform
         self.max_seq_prot = 0
         self.max_seq_pept = 0
