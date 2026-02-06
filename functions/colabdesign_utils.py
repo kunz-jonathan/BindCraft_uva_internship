@@ -17,6 +17,22 @@ from .biopython_utils import hotspot_residues, calculate_clash_score, calc_ss_pe
 from .pyrosetta_utils import pr_relax, align_pdbs
 from .generic_utils import update_failures
 from .seq_loss import add_seq_loss
+import equinox as eqx
+import esm  # pip install fcair-esm==2.0.0
+import esm2quinox
+import jax
+import jax.lax as lax
+import jax.numpy as jnp
+import jax.random as jr
+import jax.random as jrandom
+import numpy as np
+import optax  # pip install optax
+import pandas as pd
+from torch.utils.data import DataLoader, RandomSampler, random_split
+from colabdesign.af.alphafold.common import residue_constants
+from surr_model.functions.model import AFF_PREDICTOR, stripped_PREDICTOR
+import pickle
+from transformers import AutoTokenizer, AutoModel
 
 # hallucinate a binder
 def binder_hallucination(design_name, starting_pdb, chain, target_hotspot_residues, length, seed, helicity_value, design_models, advanced_settings, design_paths, failure_csv):
@@ -53,7 +69,17 @@ def binder_hallucination(design_name, starting_pdb, chain, target_hotspot_residu
     ### additional loss functions
     
     if advanced_settings['loss_func_seq']:
-        add_seq_loss(af_model, advanced_settings["weights_seq_loss"])
+        model_key, call_key = jr.split(jrandom.PRNGKey(0), 2)
+        torch_model, _ = esm.pretrained.esm2_t6_8M_UR50D()
+        model_esm2 = esm2quinox.from_torch(torch_model)
+        model_aff, model_state = eqx.nn.make_with_state(stripped_PREDICTOR)(
+            model=model_esm2, key=model_key
+        )
+
+        # set to inference mode
+        inference_model = eqx.nn.inference_mode(model_aff)
+        inference_model = eqx.Partial(inference_model, state=model_state)
+        add_seq_loss(af_model,inference_model,model_esm2, advanced_settings["weights_seq_loss"])
     
     
     # BindCraft natives

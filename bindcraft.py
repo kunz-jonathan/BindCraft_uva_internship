@@ -3,7 +3,8 @@
 ####################################
 ### Import dependencies
 from functions import *
-
+import jax
+import equinox as eqx
 # Check if JAX-capable GPU is available, otherwise exit
 check_jax_gpu()
 
@@ -70,6 +71,10 @@ accepted_designs = 0
 
 ### start design loop
 while True:
+    #clear jax and equinox caches, otherwise esm2-model will have some issues with static embeddings
+    eqx.clear_caches()
+    jax.clear_caches()
+    
     ### check if we have the target number of binders
     final_designs_reached = check_accepted_designs(design_paths, mpnn_csv, final_labels, final_csv, advanced_settings, target_settings, design_labels)
 

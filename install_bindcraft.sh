@@ -66,14 +66,14 @@ if [ -n "$cuda" ]; then
   CONDA_OVERRIDE_CUDA="$cuda" $pkg_manager install \
     pip pandas matplotlib 'numpy<2.0.0' biopython scipy pdbfixer seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta fsspec py3dmol \
     chex dm-haiku 'flax<0.10.0' dm-tree joblib ml-collections immutabledict optax \
-    'jax>=0.4,<=0.6.0' 'jaxlib>=0.4,<=0.6.0=*cuda*' cuda-nvcc cudnn \
+    'jax>=0.4,<0.5.0' 'jaxlib>=0.4,<0.5.0=*cuda*' cuda-nvcc cudnn \
     -c conda-forge -c nvidia --channel https://conda.graylab.jhu.edu -y \
   || { echo -e "Error: Failed to install conda packages."; exit 1; }
 else
   $pkg_manager install \
     pip pandas matplotlib 'numpy<2.0.0' biopython scipy pdbfixer seaborn libgfortran5 tqdm jupyter ffmpeg pyrosetta fsspec py3dmol \
     chex dm-haiku 'flax<0.10.0' dm-tree joblib ml-collections immutabledict optax \
-    'jax>=0.4,<=0.6.0' 'jaxlib>=0.4,<=0.6.0' \
+    'jax>=0.4,<0.5.0' 'jaxlib>=0.4,<0.5.0' \
     -c conda-forge -c nvidia --channel https://conda.graylab.jhu.edu -y \
   || { echo -e "Error: Failed to install conda packages."; exit 1; }
 fi
@@ -102,40 +102,40 @@ pip3 install git+https://github.com/sokrypton/ColabDesign.git --no-deps || { ech
 python -c "import colabdesign" >/dev/null 2>&1 || { echo -e "Error: colabdesign module not found after installation"; exit 1; }
 
 # AlphaFold2 weights
-echo -e "Downloading AlphaFold2 model weights \n"
-params_dir="${install_dir}/params"
-params_file="${params_dir}/alphafold_params_2022-12-06.tar"
+# echo -e "Downloading AlphaFold2 model weights \n"
+# params_dir="${install_dir}/params"
+# params_file="${params_dir}/alphafold_params_2022-12-06.tar"
 
-# download AF2 weights
-mkdir -p "${params_dir}" || { echo -e "Error: Failed to create weights directory"; exit 1; }
-wget -O "${params_file}" "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" || { echo -e "Error: Failed to download AlphaFold2 weights"; exit 1; }
-[ -s "${params_file}" ] || { echo -e "Error: Could not locate downloaded AlphaFold2 weights"; exit 1; }
+# # download AF2 weights
+# mkdir -p "${params_dir}" || { echo -e "Error: Failed to create weights directory"; exit 1; }
+# wget -O "${params_file}" "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar" || { echo -e "Error: Failed to download AlphaFold2 weights"; exit 1; }
+# [ -s "${params_file}" ] || { echo -e "Error: Could not locate downloaded AlphaFold2 weights"; exit 1; }
 
-# extract AF2 weights
-tar tf "${params_file}" >/dev/null 2>&1 || { echo -e "Error: Corrupt AlphaFold2 weights download"; exit 1; }
-tar -xvf "${params_file}" -C "${params_dir}" || { echo -e "Error: Failed to extract AlphaFold2weights"; exit 1; }
-[ -f "${params_dir}/params_model_5_ptm.npz" ] || { echo -e "Error: Could not locate extracted AlphaFold2 weights"; exit 1; }
-rm "${params_file}" || { echo -e "Warning: Failed to remove AlphaFold2 weights archive"; }
+# # extract AF2 weights
+# tar tf "${params_file}" >/dev/null 2>&1 || { echo -e "Error: Corrupt AlphaFold2 weights download"; exit 1; }
+# tar -xvf "${params_file}" -C "${params_dir}" || { echo -e "Error: Failed to extract AlphaFold2weights"; exit 1; }
+# [ -f "${params_dir}/params_model_5_ptm.npz" ] || { echo -e "Error: Could not locate extracted AlphaFold2 weights"; exit 1; }
+# rm "${params_file}" || { echo -e "Warning: Failed to remove AlphaFold2 weights archive"; }
 
-# chmod executables
-echo -e "Changing permissions for executables\n"
-chmod +x "${install_dir}/functions/dssp" || { echo -e "Error: Failed to chmod dssp"; exit 1; }
-chmod +x "${install_dir}/functions/DAlphaBall.gcc" || { echo -e "Error: Failed to chmod DAlphaBall.gcc"; exit 1; }
+# # chmod executables
+# echo -e "Changing permissions for executables\n"
+# chmod +x "${install_dir}/functions/dssp" || { echo -e "Error: Failed to chmod dssp"; exit 1; }
+# chmod +x "${install_dir}/functions/DAlphaBall.gcc" || { echo -e "Error: Failed to chmod DAlphaBall.gcc"; exit 1; }
 
 # finish
-conda deactivate
-echo -e "bindcraft_git environment set up\n"
+# conda deactivate
+# echo -e "bindcraft_git environment set up\n"
 
-############################################################################################################
-############################################################################################################
-################## cleanup
-echo -e "Cleaning up ${pkg_manager} temporary files to save space\n"
-$pkg_manager clean -a -y
-echo -e "$pkg_manager cleaned up\n"
+# ############################################################################################################
+# ############################################################################################################
+# ################## cleanup
+# echo -e "Cleaning up ${pkg_manager} temporary files to save space\n"
+# $pkg_manager clean -a -y
+# echo -e "$pkg_manager cleaned up\n"
 
-################## finish script
-t=$SECONDS 
-echo -e "Successfully finished bindcraft_git installation!\n"
-echo -e "Activate environment using command: \"$pkg_manager activate bindcraft_git\""
-echo -e "\n"
-echo -e "Installation took $(($t / 3600)) hours, $((($t / 60) % 60)) minutes and $(($t % 60)) seconds."
+# ################## finish script
+# t=$SECONDS 
+# echo -e "Successfully finished bindcraft_git installation!\n"
+# echo -e "Activate environment using command: \"$pkg_manager activate bindcraft_git\""
+# echo -e "\n"
+# echo -e "Installation took $(($t / 3600)) hours, $((($t / 60) % 60)) minutes and $(($t % 60)) seconds."

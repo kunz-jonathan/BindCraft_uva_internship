@@ -174,15 +174,16 @@ class stripped_PREDICTOR(eqx.Module):
         self.esm2 = model  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
         # output size is 480
         self.prot_droput = eqx.nn.Dropout(p=0.2)
-        self.prot_projection = eqx.nn.Linear(in_features=640,out_features=320,key=key1)
+        self.prot_projection = eqx.nn.Linear(in_features=320,out_features=320,key=key1)
         
         self.pept_droput = eqx.nn.Dropout(p=0.2)
-        self.pept_projection = eqx.nn.Linear(in_features=640,out_features=320,key=key2)
+        self.pept_projection = eqx.nn.Linear(in_features=320,out_features=320,key=key2)
+
 
     def __call__(self, tokens_prot, tokens_pept, state, key):
         ### PROTEIN ###
-        emb_prot = self.esm2(tokens_prot).hidden  # ([batch], seq_length, 320)
-        emb_prot = jnp.transpose(emb_prot, (1, 0))  # out: ([batch], 320, seq_length)
+        emb_prot = tokens_prot #self.esm2(tokens_prot).hidden  # ([batch], seq_length, 320)
+        emb_prot = jnp.transpose(emb_prot.squeeze(), (1, 0))  # out: ([batch], 320, seq_length)
         x_prot = jnp.array(emb_prot)
         x_prot = jnp.mean(
             x_prot, axis=1, keepdims=True
@@ -196,8 +197,8 @@ class stripped_PREDICTOR(eqx.Module):
         
 
         ### PEPTIDE ###
-        emb_pept = self.esm2(tokens_pept).hidden  # ([batch], seq_length, 320)
-        emb_pept = jnp.transpose(emb_pept, (1, 0))  # out: ([batch], 320, seq_length)
+        emb_pept = jax.vmap(self.esm2)(tokens_pept).hidden  # ([batch], seq_length, 320)
+        emb_pept = jnp.transpose(emb_pept.squeeze(), (1, 0))  # out: ([batch], 320, seq_length)
         x_pept = jnp.array(emb_pept)
         x_pept = jnp.mean(
             x_pept, axis=1, keepdims=True

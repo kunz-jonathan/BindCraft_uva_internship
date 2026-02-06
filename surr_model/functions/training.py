@@ -155,7 +155,7 @@ def eval_step(model, x_prot, x_pept, y, key):
     """
     pred_y, _ = jax.vmap(model)(
         x_prot, x_pept, key=key
-    )  # do i actually need the axis_stuff
+    )  
     loss = jnp.mean((y - pred_y) ** 2)
     return loss, pred_y
 
