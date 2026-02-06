@@ -12,3 +12,11 @@ notebooks/__pycache__
 
 surr_model/dataset/__pycache__
 surr_model/functions/__pycache__
+surr_model/training_results
+surr_model/pytorch_implementation/models/*
+surr_model/pytorch_implementation/__pycache__
+surr_model/pytorch_implementation/*.log
+surr_model/training_results_jax/*
+data/sequences/*
+surr_model/functions/training/*.log
+surr_model/params/*

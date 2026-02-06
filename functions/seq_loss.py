@@ -1,4 +1,3 @@
-import math
 import os
 import sys
 
@@ -6,23 +5,16 @@ import equinox as eqx
 import esm  # pip install fcair-esm==2.0.0
 import esm2quinox
 import jax
-import jax.lax as lax
 import jax.numpy as jnp
 import jax.random as jr
 import jax.random as jrandom
-import numpy as np
-import optax  # pip install optax
-import pandas as pd
-from torch.utils.data import DataLoader, RandomSampler, random_split
-from colabdesign.af.alphafold.common import residue_constants
-from surr_model.functions.model import AFF_PREDICTOR, stripped_PREDICTOR
-import pickle
-from transformers import AutoTokenizer, AutoModel
+
+from surr_model.pytorch_implementation.model_equinox import jax_predictor
 
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(), "..")))
 
 
-def add_seq_loss(self,inference_model,model_esm2, loss_weight: float) -> None:
+def add_seq_loss(self, loss_weight: float) -> None:
     """
     wrapper around loss function that registers seq_loss in af_model
 
@@ -38,10 +30,22 @@ def add_seq_loss(self,inference_model,model_esm2, loss_weight: float) -> None:
     model_key, call_key = jr.split(jrandom.PRNGKey(0), 2)
 
     # initializing models
+    model_esm2_torch_prot, _ = esm.pretrained.esm2_t30_150M_UR50D()
+    model_esm2_torch_pept, _ = esm.pretrained.esm2_t30_150M_UR50D()
+    model_esm2_prot = esm2quinox.from_torch(model_esm2_torch_prot)
+    model_esm2_pept = esm2quinox.from_torch(model_esm2_torch_pept)
+    model_aff =jax_predictor(
+        model_prot=model_esm2_prot,model_pept=model_esm2_pept, key=model_key
+    )
 
-
-    # load best inference pretrained model
-    # best_model_aff = eqx.tree_deserialise_leaves('/home/kunzj/BindCraft_uva_internship/surr_model/params/model_inference_second_training_set.eqx',inference_model)
+    # set to inference mode
+    inference_model = eqx.nn.inference_mode(model_aff)
+   
+    # load best inference pretrained model ~ change based on iteration
+    best_model_aff = eqx.tree_deserialise_leaves(
+        "/home/kunzj/BindCraft_uva_internship/surr_model/pytorch_implementation/models/equinox/second_iteration/model_affinity_final.eqx",
+        inference_model,
+    )
 
     # define target sequence
     x_prot = jnp.array(
@@ -213,14 +217,13 @@ def add_seq_loss(self,inference_model,model_esm2, loss_weight: float) -> None:
         ]
     )
 
+    # change shape of call_key to fit input shape
     call_key = jr.split(call_key, x_prot.shape[0])
 
     # map af2 colabdesign aa-dic to esm2 equinox aa-dic
     aa_to_esm_array = jnp.array(
         [5, 10, 17, 13, 23, 16, 9, 6, 21, 12, 4, 15, 20, 18, 14, 8, 11, 22, 19, 7]
     )
-
-    x_prot = jax.vmap(model_esm2)(x_prot).hidden
 
     # --- JAX-compatible function ---
     def seq_to_esm_numbers(seq):
@@ -229,11 +232,13 @@ def add_seq_loss(self,inference_model,model_esm2, loss_weight: float) -> None:
         seq_esm_numbers = aa_to_esm_array[seq_letters_idx]  # array indexing
         return jnp.array(seq_esm_numbers)
 
-    @eqx.filter_jit
+    # @eqx.filter_jit
     def loss_fn(aux: dict) -> float:
         """
         seq.-loss function
-
+        maps sequence based predicted binding affinity to loss term which introduces binding affinity
+        information into bindcraft binder generation
+        
         Args:
             aux (dict): af2 dictionary containing all relevant information
 
@@ -241,19 +246,19 @@ def add_seq_loss(self,inference_model,model_esm2, loss_weight: float) -> None:
             seq_loss (float): loss value
 
         """
+        # use pseudo-seq representation
         seq_esm = seq_to_esm_numbers(aux["seq"]["pseudo"].argmax(-1))
 
-        # batched version
-        # pred_y, _ = jax.vmap(inference_model)(x_prot, seq_esm, key=call_key)
-
-        pred_y, _ = jax.lax.stop_gradient(
-            inference_model(x_prot, seq_esm, key=call_key)
+        # stop gradients to flow through surrogate model to not change weights
+        pred_y = jax.lax.stop_gradient(
+            jax.vmap(best_model_aff)(x_prot, seq_esm, key=call_key)
         )
-        
-        
-        seq_loss = jax.nn.relu(pred_y).squeeze()
 
-        return {"seq_loss": seq_loss}
+        # map predicted_affinity to seq_loss
+        seq_loss = jax.nn.relu(pred_y).squeeze()
+        p = 1 - seq_loss
+        jax.debug.print('own reported seq_loss: {x}',x= seq_loss)
+        return {"seq_loss": p}
 
     self._callbacks["model"]["loss"].append(loss_fn)
     self.opt["weights"]["seq_loss"] = loss_weight

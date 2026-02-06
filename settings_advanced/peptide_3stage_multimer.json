@@ -10,10 +10,10 @@
     "rm_template_sc_predict": false,
     "predict_initial_guess": true,
     "predict_bigbang": false,
-    "soft_iterations": 20,
-    "temporary_iterations": 0,
-    "hard_iterations": 0,
-    "greedy_iterations": 0,
+    "soft_iterations": 75,
+    "temporary_iterations": 45,
+    "hard_iterations": 5,
+    "greedy_iterations": 15,
     "greedy_percentage": 5,
     "save_design_animations": false,
     "save_design_trajectory_plots": false,
@@ -34,8 +34,8 @@
     "weights_rg": 0.3,
     "use_termini_distance_loss": false,
     "weights_termini_loss": 0.1,
-    "enable_mpnn": false,
-    "mpnn_fix_interface": false,
+    "enable_mpnn": true,
+    "mpnn_fix_interface": true,
     "num_seqs": 10,
     "max_mpnn_sequences": 2,
     "sampling_temp": 0.1,
@@ -64,5 +64,5 @@
     "dssp_path": "",
     "dalphaball_path": "",
     "loss_func_seq": true,
-    "weights_seq_loss": 1.2
+    "weights_seq_loss": 0.8
 }

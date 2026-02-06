@@ -1,14 +1,19 @@
+import torch.nn.functional as F
+import torch
+from peft import LoraConfig, LoKrConfig,TaskType, get_peft_model
 import equinox as eqx
 import esm2quinox
-import jax
-import jax.numpy as jnp
 import jax.random as jr
-from collections.abc import Callable
-import optax 
+import jax
+import torch.nn as nn
+import jax.numpy as jnp
+import optax
+import esm
+from transformers import AutoModel
 
-class stripped_PREDICTOR(eqx.Module):
-    esm2: esm2quinox.ESM2
-
+class jax_predictor(eqx.Module):
+    esm2_prot: esm2quinox.ESM2
+    esm2_pept: esm2quinox.ESM2
     pooler_layer_prot: eqx.nn.Linear
     pooler_layer_pept: eqx.nn.Linear
     prot_droput: eqx.nn.Dropout
@@ -17,11 +22,11 @@ class stripped_PREDICTOR(eqx.Module):
     pept_projection: eqx.nn.Linear
     
 
-    def __init__(self, model, key):
+    def __init__(self, model_prot,model_pept, key):
         key1, key2,key3,key4= jr.split(key, 4)
 
-        self.esm2 = model  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
-
+        self.esm2_prot = model_prot  # (num_layers=3, embed_size=32, num_heads=2, token_dropout=False, key=key)
+        self.esm2_pept = model_pept
         # output size is 480
         self.pooler_layer_prot = eqx.nn.Linear(in_features= 640,out_features=640,key=key3)
         self.prot_droput = eqx.nn.Dropout(p=0.2)
@@ -34,7 +39,7 @@ class stripped_PREDICTOR(eqx.Module):
 
     def __call__(self, tokens_prot, tokens_pept, key):
         ### PROTEIN ###
-        emb_prot = self.esm2(tokens_prot).hidden # ([batch], seq_length, 320)
+        emb_prot = self.esm2_prot(tokens_prot).hidden # ([batch], seq_length, 320)
         if emb_prot.ndim == 3:
             # [B, L, H]
             emb_prot = emb_prot[:, 0]
@@ -50,7 +55,7 @@ class stripped_PREDICTOR(eqx.Module):
         
 
         ### PEPTIDE ###
-        emb_pept = self.esm2(tokens_pept).hidden  # ([batch], seq_length, 320)
+        emb_pept = self.esm2_pept(tokens_pept).hidden  # ([batch], seq_length, 320)
         if emb_pept.ndim == 3:
             # [B, L, H]
             emb_pept = emb_pept[:, 0]
@@ -68,3 +73,4 @@ class stripped_PREDICTOR(eqx.Module):
         
 
         return pred_aff
+    
