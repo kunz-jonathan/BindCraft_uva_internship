@@ -1,0 +1,9 @@
+{
+    "design_path": "/home/jkunz/master_uni_hd/internship_amsterdam/BindCraft_uva_internship/out_dummy",
+    "binder_name": "dummy",
+    "starting_pdb": "/home/jkunz/master_uni_hd/internship_amsterdam/BindCraft_uva_internship/example/1VII.pdb",
+    "chains": "A",
+    "target_hotspot_residues": "70",
+    "lengths": [3, 5],
+    "number_of_final_designs": 3
+}

@@ -20,3 +20,7 @@ surr_model/training_results_jax/*
 data/sequences/*
 surr_model/functions/training/*.log
 surr_model/params/*
+
+.gitignore
+
+__pycache__
